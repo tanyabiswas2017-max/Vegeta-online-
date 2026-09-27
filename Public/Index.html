@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vegeta - Fresh Vegetables</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial;background:#f5fff4;color:#183018}
+header{background:#208a3b;color:#fff;padding:15px}
+.nav,main{max-width:1050px;margin:auto}
+.nav{display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:26px;font-weight:800}
+.btn{border:0;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer}
+.white{background:#fff;color:#208a3b}
+.green{background:#208a3b;color:#fff}
+.hero{max-width:1050px;margin:18px auto;padding:32px 20px;border-radius:20px;background:linear-gradient(135deg,#dff8d8,#fff);text-align:center}
+.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;padding:0 16px}
+.card,.cart{background:#fff;border-radius:16px;padding:15px;box-shadow:0 2px 10px #0001}
+.emoji{font-size:52px}
+.price{font-size:19px;font-weight:800;color:#208a3b}
+.add{width:100%;padding:10px;border:0;border-radius:9px;background:#e5f7e2;font-weight:700}
+.cart{margin:25px 16px;padding:18px}
+input,select{width:100%;padding:11px;margin:5px 0;border:1px solid #ccc;border-radius:9px}
+#map{height:280px;border-radius:12px;overflow:hidden;border:1px solid #ddd;margin:10px 0}
+.maptools{display:flex;gap:8px;flex-wrap:wrap}
+.row{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:10px 0}
+</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+<header>
+<div class="nav">
+<div class="logo">🥬 Vegeta</div>
+<button class="btn white" onclick="document.getElementById('cart').scrollIntoView()">🛒 Cart <span id="count">0</span></button>
+</div>
+</header>
+
+<section class="hero">
+<h1>Fresh Vegetables, Delivered</h1>
+<p>Fresh • Quality • Affordable</p>
+<button class="btn green" onclick="document.getElementById('products').scrollIntoView()">Shop Now</button>
+</section>
+
+<main>
+<h2 style="padding:0 16px">Popular Vegetables</h2>
+<div id="products" class="products"></div>
+
+<section class="cart" id="cart">
+<h2>Your Cart</h2>
+<div id="cartItems">Your cart is empty.</div>
+<h3>Total: ₹<span id="total">0.00</span></h3>
+
+<input id="name" placeholder="Your Name">
+<input id="address" placeholder="Delivery Address">
+<input id="phone" placeholder="Phone Number">
+
+<h3>📍 Delivery Location</h3>
+<div id="map"></div>
+
+<div class="maptools">
+<button type="button" class="btn green" onclick="useMyLocation()">📍 Use My Location</button>
+<button type="button" class="btn" onclick="clearLocation()">✕ Clear</button>
+</div>
+
+<p id="locationStatus">Tap the map to select your delivery location.</p>
+
+<button class="btn green" onclick="placeOrder()">Place Order on WhatsApp</button>
+</section>
+</main>
+
+<script>
+let products=[],cart=[],map=null,mapMarker=null,selectedLocation=null;
+
+function initMap(){
+map=L.map('map').setView([23.1,88.5],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+attribution:'© OpenStreetMap contributors'
+}).addTo(map);
+map.on('click',e=>setLocation(e.latlng.lat,e.latlng.lng));
+}
+
+function setLocation(lat,lng){
+selectedLocation={lat,lng};
+if(mapMarker)map.removeLayer(mapMarker);
+mapMarker=L.marker([lat,lng]).addTo(map);
+map.setView([lat,lng],16);
+document.getElementById('locationStatus').textContent='Location selected: '+lat.toFixed(6)+', '+lng.toFixed(6);
+}
+
+function useMyLocation(){
+if(!navigator.geolocation)return alert('Location is not supported.');
+navigator.geolocation.getCurrentPosition(
+p=>setLocation(p.coords.latitude,p.coords.longitude),
+()=>alert('Could not get your location.')
+);
+}
+
+function clearLocation(){
+selectedLocation=null;
+if(mapMarker){map.removeLayer(mapMarker);mapMarker=null}
+document.getElementById('locationStatus').textContent='Tap the map to select your delivery location.'
+}
+
+let lastProductsJson='';
+
+async function load(force=false){
+try{
+const fresh=await (await fetch('/api/products',{cache:'no-store'})).json();
+const freshJson=JSON.stringify(fresh);
+if(force || freshJson!==lastProductsJson){
+products=fresh;
+lastProductsJson=freshJson;
+render();
+setTimeout(()=>map&&map.invalidateSize(),200);
+}
+}catch(e){console.warn('Product refresh failed',e)}
+}
+
+setInterval(()=>load(false),2000);
+
+function render(){
+document.getElementById('products').innerHTML=products.map((p,i)=>`
+<div class="card">
+<div class="emoji">${p.emoji}</div>
+<h3>${p.name}</h3>
+<div class="price">₹${p.price} / kg</div>
+${p.stock?
+`<select id="q${i}">
+<option value=".1">100 g</option>
+<option value=".25">250 g</option>
+<option value=".5">500 g</option>
+<option value="1" selected>1 kg</option>
+<option value="2">2 kg</option>
+<option value="5">5 kg</option>
+</select>
+<button class="add" onclick="add(${i})">Add to Cart</button>`
+:`<p>Out of stock</p>`}
+</div>`).join('');
+renderCart();
+}
+
+function add(i){
+cart.push({
+productId:products[i].id,
+qty:Number(document.getElementById('q'+i).value),
+name:products[i].name,
+price:products[i].price,
+emoji:products[i].emoji
+});
+renderCart();
+}
+
+function renderCart(){
+document.getElementById('count').textContent=cart.length;
+if(!cart.length){
+document.getElementById('cartItems').innerHTML='Your cart is empty.';
+document.getElementById('total').textContent='0.00';
+return;
+}
+
+let t=0;
+
+document.getElementById('cartItems').innerHTML=cart.map((x,i)=>{
+let v=x.price*x.qty;
+t+=v;
+return `<div class="row">
+<span>${x.emoji} ${x.name} — ${x.qty<1?Math.round(x.qty*1000)+' g':x.qty+' kg'}</span>
+<span>₹${v.toFixed(2)} <button onclick="cart.splice(${i},1);renderCart()">✕</button></span>
+</div>`;
+}).join('');
+
+document.getElementById('total').textContent=t.toFixed(2);
+}
+
+async function placeOrder(){
+if(!cart.length)return alert('Add vegetables first.');
+
+let customer=name.value.trim();
+let address=document.getElementById('address').value.trim();
+let phone=document.getElementById('phone').value.trim();
+
+if(!customer||!address||!phone)
+return alert('Please fill in delivery details.');
+
+if(!selectedLocation)
+return alert('Please select your delivery location on the map.');
+
+let r=await fetch('/api/orders',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({
+customer,
+phone,
+address,
+location:selectedLocation,
+items:cart.map(x=>({productId:x.productId,qty:x.qty}))
+})
+});
+
+let d=await r.json();
+
+if(!r.ok)return alert(d.error||'Order failed');
+
+alert('Order received! Order ID: '+d.orderCode);
+window.open(d.whatsappUrl,'_blank');
+
+cart=[];
+renderCart();
+}
+
+initMap();
+load(true);
+</script>
+</body>
+</html>
