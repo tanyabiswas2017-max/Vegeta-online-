@@ -1,7 +1,16 @@
 {
-  "name":"vegeta-online",
-  "version":"1.0.0",
-  "private":true,
-  "scripts":{"start":"node server.js"},
-  "dependencies":{"better-sqlite3":"^11.8.1","express":"^4.21.2","express-session":"^1.18.1"}
+  "name": "vegeta-online",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1"
+  },
+  "engines": {
+    "node": "20.x"
+  }
 }
