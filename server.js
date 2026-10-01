@@ -134,5 +134,5 @@ app.delete("/api/admin/products/:id",admin,(req,res)=>{
 });
 
 app.get("/admin",(req,res)=>res.sendFile(path.join(__dirname,"public","admin.html")));
-app.get("/", (req,res)=>res.sendFile(path.join(__dirname,"public","Index.html")));
+app.get("/", (req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 app.listen(PORT,()=>console.log(`Vegeta running on port ${PORT}`));
